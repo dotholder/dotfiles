@@ -50,7 +50,7 @@ function rmf {
 
 # Git aliases
 function dotfiles {
-    git clone https://github.com/barkifyings/dotfiles.git
+    git clone https://github.com/dotholder/dotfiles.git
 }
 
 # System commands

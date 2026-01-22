@@ -22,7 +22,7 @@ alias rm='rm -iv'
 
 # Git aliases
 alias gc='git clone'
-alias dotfiles='git clone https://github.com/barkifyings/dotfiles.git'
+alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # Python aliases
 alias pip='pip3'

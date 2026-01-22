@@ -25,7 +25,7 @@ alias rm='rm -iv'
 
 # Git aliases
 alias gc='git clone'
-alias dotfiles='git clone https://github.com/barkifyings/dotfiles.git'
+alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # yt-dlp aliases
 alias yt-playlist="yt -cio '%(autonumber)s-%(title)s.%(ext)s'"
