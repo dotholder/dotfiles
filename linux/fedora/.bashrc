@@ -125,5 +125,49 @@ function extract-frames {
     "$output_dir/frame_%08d.png" \
     -loglevel error -stats
   
+  if [ $? -ne 0 ]; then
+    echo "Error: ffmpeg extraction failed"
+    return 1
+  fi
+  
   echo "✅ Extraction complete"
+  
+  # --- Deduplication: remove exact pixel duplicates (global, not just consecutive) ---
+  echo "Removing exact duplicate frames (keeping first occurrence)..."
+  cd "$output_dir" || return 1
+  
+  declare -A seen
+  
+  # First pass: delete duplicates while preserving order
+  mapfile -t files < <(printf "%s\n" frame_*.png 2>/dev/null | sort -V)
+  
+  local deleted_count=0
+  for file in "${files[@]}"; do
+    if [ -f "$file" ]; then
+      local hash=$(md5sum "$file" | awk '{print $1}')
+      if [[ ${seen[$hash]+exists} ]]; then
+        rm -f "$file"
+        ((deleted_count++))
+      else
+        seen[$hash]=1
+      fi
+    fi
+  done
+  
+  # Second pass: renumber remaining unique frames sequentially (no gaps)
+  mapfile -t remaining < <(printf "%s\n" frame_*.png 2>/dev/null | sort -V)
+  
+  local i=1
+  for file in "${remaining[@]}"; do
+    local newname=$(printf "frame_%08d.png" "$i")
+    if [ "$file" != "$newname" ]; then
+      mv "$file" "$newname"
+    fi
+    ((i++))
+  done
+  
+  local unique_count=$((i - 1))
+  echo "✅ Deduplication complete: $deleted_count duplicate(s) removed, $unique_count unique frame(s) kept"
+  
+  cd - > /dev/null
 }
