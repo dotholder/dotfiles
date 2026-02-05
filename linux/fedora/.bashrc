@@ -28,7 +28,7 @@ alias gc='git clone'
 alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # yt-dlp aliases
-alias yt-playlist="yt -cio '%(autonumber)s-%(title)s.%(ext)s'"
+alias yt-playlist="yt-best -cio '%(autonumber)s-%(title)s.%(ext)s'"
 alias yta-aac="yt --extract-audio --audio-format aac"
 alias yta-best="yt --extract-audio --audio-format best"
 alias yta-flac="yt --extract-audio --audio-format flac"
@@ -37,7 +37,7 @@ alias yta-mp3="yt --extract-audio --audio-format mp3"
 alias yta-opus="yt --extract-audio --audio-format opus"
 alias yta-vorbis="yt --extract-audio --audio-format vorbis"
 alias yta-wav="yt --extract-audio --audio-format wav"
-alias yt-best="yt -f bestvideo+bestaudio"
+alias yt-best="yt --cookies-from-browser firefox -f bestvideo+bestaudio"
 alias yt='yt-dlp'
 alias ytv='yt -f bestvideo'
 alias yta='yt -f bestaudio'
