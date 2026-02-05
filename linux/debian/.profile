@@ -72,10 +72,9 @@ PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\
 # Archive extractor
 ex () {
   if [ -f "$1" ]; then
-    case $1 in
-      *.tar.bz2|*.tbz2)    tar xjf "$1"       ;;
-      *.tar.gz|*.tgz)      tar xzf "$1"       ;;
-      *.tar|*.tar.xz)      tar xf "$1"        ;;
+    case "$1" in
+      *.tar*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst|*.tar.zst|*.tar.gz|*.tar.bz2|*.tar.xz)
+        tar xf "$1" ;;
       *.bz2)               bunzip2 "$1"       ;;
       *.rar)               unrar x "$1"       ;;
       *.gz)                gunzip "$1"        ;;
@@ -83,9 +82,8 @@ ex () {
       *.Z)                 uncompress "$1"    ;;
       *.7z)                7z x "$1"          ;;
       *.lzma)              lzma -d "$1"       ;;
-      *.deb)               ar x "$1"          ;;
       *.xz)                unxz "$1"          ;;
-      *.tar.zst)           unzstd "$1"        ;;
+      *.deb)               ar x "$1"          ;;
       *)                   echo "'$1' cannot be extracted" ;;
     esac
   else
@@ -98,27 +96,36 @@ ex () {
 # Video frame extractor
 function extract-frames {
   local input_file="$1"
-  local base_name=$(basename "$input_file" | sed 's/\.[^.]*$//')
-  local output_dir="${2:-${base_name}_frames}"
+  local output_dir="${2:-}"
   
-  # Check if input file was provided
   if [ -z "$input_file" ]; then
     echo "Usage: extract-frames <video_file> [output_dir]"
     return 1
   fi
   
-  # Check if input file exists
   if [ ! -f "$input_file" ]; then
     echo "Error: Input file \"$input_file\" does not exist"
     return 1
   fi
   
-  # Create output directory if it doesn't exist
+  local filename="${input_file##*/}"
+  local base_name="${filename%.*}"
+  output_dir="${output_dir:-${base_name}_frames}"
+  
   mkdir -p "$output_dir"
   
-  # Extract frames using ffmpeg
   echo "Extracting frames..."
-  ffmpeg -i "$input_file" "$output_dir/frame_%d.png"
+  echo "Output → $output_dir/frame_00000001.png"
+  echo "This may take a long time."
+  
+  ffmpeg -threads "$(nproc)" -i "$input_file" \
+    -vsync 0 \
+    -start_number 1 \
+    -c:v png \
+    -pred mixed \
+    -compression_level 6 \
+    "$output_dir/frame_%08d.png" \
+    -loglevel error -stats
   
   echo "✅ Extraction complete"
 }
