@@ -265,7 +265,7 @@ function Extract-Frames {
         $finalCount = $initialCount
     }
 
-    Write-Host "$([char]0x1F3A8) Done: $finalCount unique frames saved in $resolvedOutput"
+    Write-Host "Done: $finalCount unique frames saved in $resolvedOutput"
 }
 
 #Video flipper
