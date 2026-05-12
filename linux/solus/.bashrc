@@ -20,8 +20,8 @@ alias poweroff='sudo systemctl poweroff'
 alias info='inxi -Fxxxrza'
 
 # Navigation & files
-alias ls='exa -l --color=always --group-directories-first'
-alias la='exa -al --color=always --group-directories-first'
+alias ls='eza -l --color=always --group-directories-first'
+alias la='eza -al --color=always --group-directories-first'
 alias ..='cd ..'
 alias rm='rm -iv'
 
