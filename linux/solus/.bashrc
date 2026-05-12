@@ -9,7 +9,7 @@ fastfetch
 # ============================
 
 # Package management
-alias update='sudo eopkg upgrade --no-safety && sudo eopkg remove-orphans'
+alias update='sudo eopkg upgrade && sudo eopkg remove-orphans'
 alias install='sudo eopkg install'
 alias remove='sudo eopkg remove'
 alias search='eopkg search'
