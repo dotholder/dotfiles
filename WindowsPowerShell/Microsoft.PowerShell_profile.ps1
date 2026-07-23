@@ -356,3 +356,50 @@ function Reverse-Video {
         Write-Host "$([char]0x274C) Error: $_"
     }
 }
+
+# MP4 Video Converter
+function mp4 {
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]$InputFilePath,
+
+        [string]$Preset = "medium",  # Options: ultrafast, superfast, veryfast, fast, medium, slow
+        [int]$CRF = 23              # Lower = higher quality/larger file (18-28 is sweet spot)
+    )
+
+    try {
+        $cleanPath = $InputFilePath.Trim()
+
+        if (-not (Test-Path $cleanPath)) {
+            Write-Host "$([char]0x274C) Input file not found: $cleanPath"
+            return
+        }
+
+        $fileInfo = Get-Item $cleanPath
+        $directory = $fileInfo.DirectoryName
+        $nameWithoutExt = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
+        $extension = $fileInfo.Extension.ToLower()
+
+        # Prevent overwriting if the input is already a .mp4
+        if ($extension -eq ".mp4") {
+            $outputFile = Join-Path $directory "${nameWithoutExt}_converted.mp4"
+        } else {
+            $outputFile = Join-Path $directory "${nameWithoutExt}.mp4"
+        }
+
+        Write-Host "Converting '$($fileInfo.Name)' to MP4..."
+        Write-Host "Output: $outputFile"
+
+        # -movflags +faststart enables web streaming/fast playback start
+        & ffmpeg -i "$($fileInfo.FullName)" -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "$([char]0x2705) Video converted to MP4 successfully!"
+        } else {
+            Write-Host "$([char]0x274C) Failed to convert video (Exit code: $LASTEXITCODE)"
+        }
+    }
+    catch {
+        Write-Host "$([char]0x274C) Error: $_"
+    }
+}
