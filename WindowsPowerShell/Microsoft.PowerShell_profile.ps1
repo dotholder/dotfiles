@@ -95,6 +95,11 @@ function yt-playlist {
     yt-best -cio '%(autonumber)s-%(title)s.%(ext)s' @Arguments
 }
 
+function ytmp4 {
+    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 @Arguments
+}
+
 function downloadchannel {
     param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
     yt-dlp -f bestvideo+bestaudio --continue --ignore-errors --no-overwrites -o "%(title)s.%(ext)s" @Arguments
