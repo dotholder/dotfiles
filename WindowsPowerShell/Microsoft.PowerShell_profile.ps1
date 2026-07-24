@@ -7,15 +7,15 @@ function update {
     choco upgrade all -y
 }
 function install {
-    param([string]$PackageName)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$PackageName)
     choco install $PackageName -y
 }
 function remove {
-    param([string]$PackageName)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$PackageName)
     choco uninstall $PackageName -y
 }
 function search {
-    param([string]$PackageName)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$PackageName)
     choco search $PackageName
 }
 
@@ -64,25 +64,15 @@ function info {
 }
 
 # yt-dlp aliases
-$audioFormats = @{
-    'aac'    = '--extract-audio --audio-format aac'
-    'best'   = '--extract-audio --audio-format best'
-    'flac'   = '--extract-audio --audio-format flac'
-    'm4a'    = '--extract-audio --audio-format m4a'
-    'mp3'    = '--extract-audio --audio-format mp3'
-    'opus'   = '--extract-audio --audio-format opus'
-    'vorbis' = '--extract-audio --audio-format vorbis'
-    'wav'    = '--extract-audio --audio-format wav'
-}
+$audioFormats = @('aac', 'best', 'flac', 'm4a', 'mp3', 'opus', 'vorbis', 'wav')
 
-foreach ($format in $audioFormats.Keys) {
-    $funcName = "Download-YTAudio$format"
-    $options  = $audioFormats[$format]
+foreach ($format in $audioFormats) {
+    $funcName = "yta-$format"
+    $fmt = $format
 
-    $scriptBlock = [ScriptBlock]::Create("yt-dlp $options @args")
-    Set-Item -Path Function:$funcName -Value $scriptBlock -Force
-
-    New-Alias -Name "yta-$format" -Value $funcName -Force
+    Set-Item "Function:$funcName" -Value {
+        yt-dlp --extract-audio --audio-format $fmt @args
+    }.GetNewClosure() -Force
 }
 
 function yt-best {
@@ -144,16 +134,17 @@ function Extract-Archive {
     }
 
     $dest = Split-Path -Parent $Path
-    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
+    $fileName = [System.IO.Path]::GetFileName($Path).ToLowerInvariant()
 
+    if ($fileName -match '\.(tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz)$') {
+        tar -xf $Path -C $dest
+        return
+    }
+
+    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
     switch ($extension) {
         ".zip"     { tar -xf $Path -C $dest }
         ".tar"     { tar -xf $Path -C $dest }
-        ".tar.gz"  { tar -xf $Path -C $dest }
-        ".tgz"     { tar -xf $Path -C $dest }
-        ".tar.bz2" { tar -xf $Path -C $dest }
-        ".tbz2"    { tar -xf $Path -C $dest }
-        ".tar.xz"  { tar -xf $Path -C $dest }
         ".gz"      { 7z x $Path -o"$dest" -y }
         ".bz2"     { 7z x $Path -o"$dest" -y }
         ".xz"      { 7z x $Path -o"$dest" -y }
@@ -193,7 +184,7 @@ function Extract-Frames {
     $resolvedInput = (Resolve-Path $InputFile).Path
     $resolvedOutput = (Resolve-Path $OutputDir).Path
 
-    Write-Host "Extracting frames to $resolvedOutput ..."
+    Write-Host "Extracting unique frames to $resolvedOutput..."
 
     $outputPattern = Join-Path $resolvedOutput "frame_%06d.png"
     
@@ -201,6 +192,7 @@ function Extract-Frames {
         "-hide_banner"
         "-loglevel", "error"
         "-i", $resolvedInput
+        "-vf", "mpdecimate"
         "-compression_level", "6"
         "-pred", "mixed"
         $outputPattern
@@ -213,62 +205,11 @@ function Extract-Frames {
         return
     }
 
-    Write-Host "$([char]0x2705) Extraction complete"
-
-    # --- Duplicate removal and renumbering ---
-    $frameFiles = Get-ChildItem -Path $resolvedOutput -Filter "frame_*.png"
-
-    if ($frameFiles.Count -eq 0) {
-        Write-Host "No frames were extracted."
-        return
-    }
-
-    Write-Host "Checking for exact duplicate frames (pixel-for-pixel identical)..."
-
-    $initialCount = $frameFiles.Count
-    $frameFiles = $frameFiles | Sort-Object Name
-
-    $seen = @{}
-    $dupeCount = 0
-
-    foreach ($file in $frameFiles) {
-        try {
-            $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash
-            if ($seen.ContainsKey($hash)) {
-                Remove-Item -Path $file.FullName -Force
-                $dupeCount++
-            } else {
-                $seen[$hash] = $null
-            }
-        } catch {
-            Write-Warning "Failed to hash file: $($file.Name)"
-        }
-    }
-
-    if ($dupeCount -gt 0) {
-        Write-Host "Deleted $dupeCount exact duplicate frames."
-
-        Write-Host "Renumbering remaining frames sequentially..."
-        $remainingFiles = Get-ChildItem -Path $resolvedOutput -Filter "frame_*.png" | Sort-Object Name
-        $index = 1
-        foreach ($file in $remainingFiles) {
-            $newName = "frame_{0:000000}.png" -f $index
-            if ($file.Name -ne $newName) {
-                Rename-Item -Path $file.FullName -NewName $newName -Force
-            }
-            $index++
-        }
-
-        $finalCount = $remainingFiles.Count
-    } else {
-        Write-Host "No exact duplicates found."
-        $finalCount = $initialCount
-    }
-
-    Write-Host "Done: $finalCount unique frames saved in $resolvedOutput"
+    $savedFiles = Get-ChildItem -Path $resolvedOutput -Filter "frame_*.png"
+    Write-Host "$([char]0x2705) Done: $($savedFiles.Count) unique frames saved in $resolvedOutput"
 }
 
-#Video flipper
+# Video flipper
 function Flip-Video {
     param (
         [Parameter(Mandatory=$true)]
@@ -298,10 +239,10 @@ function Flip-Video {
         Write-Host "Speed mode: $Speed"
 
         switch ($Speed) {
-            "Fast"     { $extraArgs = @("-c:v", "libx264", "-preset", "veryfast", "-crf", "18") }
-            "Ultrafast"{ $extraArgs = @("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23") }
-            "NVENC"    { $extraArgs = @("-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-c:v", "h264_nvenc", "-preset", "p7", "-cq", "19") }
-            default    { $extraArgs = @() }  # original behavior
+            "Fast"      { $extraArgs = @("-c:v", "libx264", "-preset", "veryfast", "-crf", "18") }
+            "Ultrafast" { $extraArgs = @("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23") }
+            "NVENC"     { $extraArgs = @("-c:v", "h264_nvenc", "-preset", "p7", "-cq", "19") }
+            default     { $extraArgs = @() }
         }
 
         & ffmpeg -i "$($fileInfo.FullName)" -vf "hflip" -c:a copy @extraArgs "$outputFile"
