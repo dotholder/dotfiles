@@ -37,7 +37,7 @@ function rmf {
     process {
         foreach ($p in $Path) {
             try {
-                Remove-Item -Path $p -Recurse -Force -ErrorAction Stop
+                Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop
             }
             catch {
                 Write-Warning "Could not remove $p completely: $_"
@@ -91,8 +91,8 @@ function yta {
 }
 
 function yt-playlist {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
-    yt-best -cio '%(autonumber)s-%(title)s.%(ext)s' @Arguments
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
+    yt-dlp -f bestvideo+bestaudio --continue --ignore-errors -o '%(autonumber)s-%(title)s.%(ext)s' @Arguments
 }
 
 function ytmp4 {
@@ -120,7 +120,9 @@ function prompt {
     $ESC = [char]27
     $username = $env:USERNAME
     $hostname = $env:COMPUTERNAME
-    $location = Split-Path -Leaf -Path (Get-Location)
+    $currPath = (Get-Location).Path
+    $location = Split-Path -Leaf -Path $currPath
+    if ([string]::IsNullOrWhiteSpace($location)) { $location = $currPath }
     
     "$ESC[1;31m[$ESC[33m$username$ESC[32m@$ESC[34m$hostname $ESC[35m$location$ESC[31m]$ESC[37m$ $ESC[0m"
 }
@@ -171,7 +173,7 @@ function Extract-Frames {
         return
     }
 
-    if (-not (Test-Path $InputFile)) {
+    if (-not (Test-Path -LiteralPath $InputFile)) {
         Write-Error "Error: Input file '$InputFile' does not exist"
         return
     }
@@ -182,12 +184,12 @@ function Extract-Frames {
         $OutputDir = Join-Path (Get-Location) "${sanitizedName}_frames"
     }
 
-    if (-not (Test-Path $OutputDir)) {
+    if (-not (Test-Path -LiteralPath $OutputDir)) {
         New-Item -ItemType Directory -Path $OutputDir | Out-Null
     }
 
-    $resolvedInput = (Resolve-Path $InputFile).Path
-    $resolvedOutput = (Resolve-Path $OutputDir).Path
+    $resolvedInput = (Convert-Path -LiteralPath $InputFile)
+    $resolvedOutput = (Convert-Path -LiteralPath $OutputDir)
 
     Write-Host "Extracting unique frames to $resolvedOutput..."
 
@@ -210,7 +212,7 @@ function Extract-Frames {
         return
     }
 
-    $savedFiles = Get-ChildItem -Path $resolvedOutput -Filter "frame_*.png"
+    $savedFiles = Get-ChildItem -LiteralPath $resolvedOutput -Filter "frame_*.png"
     Write-Host "$([char]0x2705) Done: $($savedFiles.Count) unique frames saved in $resolvedOutput"
 }
 
