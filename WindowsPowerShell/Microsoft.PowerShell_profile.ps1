@@ -174,8 +174,13 @@ function Extract-Frames {
     }
 
     if (-not (Test-Path -LiteralPath $InputFile)) {
-        Write-Error "Error: Input file '$InputFile' does not exist"
-        return
+        $cleanedPath = $InputFile -replace '`([\[\]])', '$1'
+        if (Test-Path -LiteralPath $cleanedPath) {
+            $InputFile = $cleanedPath
+        } else {
+            Write-Error "Error: Input file '$InputFile' does not exist"
+            return
+        }
     }
 
     if (-not $OutputDir) {
@@ -191,7 +196,7 @@ function Extract-Frames {
     $resolvedInput = (Convert-Path -LiteralPath $InputFile)
     $resolvedOutput = (Convert-Path -LiteralPath $OutputDir)
 
-    Write-Host "Extracting unique frames to $resolvedOutput..."
+    Write-Host "Extracting frames to $resolvedOutput..."
 
     $outputPattern = Join-Path $resolvedOutput "frame_%06d.png"
     
@@ -212,8 +217,32 @@ function Extract-Frames {
         return
     }
 
-    $savedFiles = Get-ChildItem -LiteralPath $resolvedOutput -Filter "frame_*.png"
-    Write-Host "$([char]0x2705) Done: $($savedFiles.Count) unique frames saved in $resolvedOutput"
+    $savedFiles = Get-ChildItem -LiteralPath $resolvedOutput -Filter "frame_*.png" | Sort-Object Name
+    $totalExtracted = $savedFiles.Count
+    
+    if ($totalExtracted -eq 0) {
+        Write-Host "$([char]0x274C) No frames were extracted."
+        return
+    }
+
+    Write-Host "Checking checksums for $totalExtracted frames..."
+
+    $seenHashes = @{}
+    $deletedCount = 0
+
+    foreach ($file in $savedFiles) {
+        $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm MD5).Hash
+
+        if ($seenHashes.ContainsKey($hash)) {
+            Remove-Item -LiteralPath $file.FullName -Force
+            $deletedCount++
+        } else {
+            $seenHashes[$hash] = $file.FullName
+        }
+    }
+
+    $remainingCount = $totalExtracted - $deletedCount
+    Write-Host "$([char]0x2705) Done: $remainingCount unique frames saved ($deletedCount duplicates removed) in $resolvedOutput"
 }
 
 # Video flipper
