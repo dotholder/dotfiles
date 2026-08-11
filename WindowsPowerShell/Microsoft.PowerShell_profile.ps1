@@ -174,7 +174,8 @@ function Extract-Frames {
         "-hide_banner"
         "-loglevel", "error"
         "-i", $resolvedInput
-        "-vf", "mpdecimate"
+        "-vf", "mpdecimate,setpts=N/FRAME_RATE/TB"
+        "-fps_mode", "vfr"
         "-compression_level", "6"
         "-pred", "mixed"
         $outputPattern

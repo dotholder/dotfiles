@@ -113,6 +113,7 @@ extract-frames () {
   cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
   ffmpeg -threads "$cores" -i "$input_file" \
+    -vf mpdecimate \
     -fps_mode passthrough \
     -start_number 1 \
     -c:v png \
