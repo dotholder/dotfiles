@@ -128,38 +128,8 @@ function prompt {
 }
 
 # ====================
-# Scripts
+# Functions
 # ====================
-
-# Archive extractor
-function Extract-Archive {
-    param([string]$Path)
-
-    if (!(Test-Path $Path -PathType Leaf)) {
-        Write-Error "'$Path' is not a valid file"
-        return
-    }
-
-    $dest = Split-Path -Parent $Path
-    $fileName = [System.IO.Path]::GetFileName($Path).ToLowerInvariant()
-
-    if ($fileName -match '\.(tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz)$') {
-        tar -xf $Path -C $dest
-        return
-    }
-
-    $extension = [System.IO.Path]::GetExtension($Path).ToLowerInvariant()
-    switch ($extension) {
-        ".zip"     { tar -xf $Path -C $dest }
-        ".tar"     { tar -xf $Path -C $dest }
-        ".gz"      { 7z x $Path -o"$dest" -y }
-        ".bz2"     { 7z x $Path -o"$dest" -y }
-        ".xz"      { 7z x $Path -o"$dest" -y }
-        ".rar"     { 7z x $Path -o"$dest" -y }
-        ".7z"      { 7z x $Path -o"$dest" -y }
-        default    { Write-Error "'$Path' cannot be extracted" }
-    }
-}
 
 # Video frame extractor
 function Extract-Frames {
@@ -357,7 +327,6 @@ function mp4 {
         $nameWithoutExt = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
         $extension = $fileInfo.Extension.ToLower()
 
-        # Prevent overwriting if the input is already a .mp4
         if ($extension -eq ".mp4") {
             $outputFile = Join-Path $directory "${nameWithoutExt}_converted.mp4"
         } else {
@@ -367,7 +336,6 @@ function mp4 {
         Write-Host "Converting '$($fileInfo.Name)' to MP4..."
         Write-Host "Output: $outputFile"
 
-        # -movflags +faststart enables web streaming/fast playback start
         & ffmpeg -i "$($fileInfo.FullName)" -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
 
         if ($LASTEXITCODE -eq 0) {

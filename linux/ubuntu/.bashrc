@@ -2,7 +2,8 @@
 # Exit if not running interactively
 [[ $- != *i* ]] && return
 
-fastfetch
+# Show system info if fastfetch is installed
+command -v fastfetch &>/dev/null && fastfetch
 
 # ============================
 # Aliases
@@ -49,10 +50,8 @@ alias downloadchannel='yt-best -w -o "%(title)s.%(ext)s"'
 # Shell Behavior and Prompt
 # ============================
 
-# Ignore case in tab completion
+# Ignore case in tab completion & show on first tab press
 bind 'set completion-ignore-case on'
-
-# Show all completions on first tab press
 bind 'set show-all-if-ambiguous on'
 
 # Don't put duplicate lines or lines starting with space in history
@@ -62,15 +61,14 @@ HISTCONTROL=ignoreboth
 PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\e[37m\]\\$ \[\e[0m\]"
 
 # ====================
-# Scripts
+# Functions
 # ====================
 
 # Archive extractor
 ex () {
   if [ -f "$1" ]; then
     case "$1" in
-      *.tar*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst|*.tar.zst|*.tar.gz|*.tar.bz2|*.tar.xz)
-        tar xf "$1" ;;
+      *.tar|*.tar.*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst) tar xf "$1" ;;
       *.bz2)   bunzip2 "$1" ;;
       *.rar)   unrar x "$1" ;;
       *.gz)    gunzip "$1" ;;
@@ -115,7 +113,7 @@ extract-frames () {
   cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
   ffmpeg -threads "$cores" -i "$input_file" \
-    -vsync 0 \
+    -fps_mode passthrough \
     -start_number 1 \
     -c:v png \
     -pred mixed \
@@ -129,17 +127,11 @@ extract-frames () {
   fi
 
   echo "✅ Extraction complete"
-
   echo "Removing exact duplicate frames..."
+
   (
     cd "$output_dir" || exit 1
     shopt -s nullglob
-    local files=(frame_*.png)
-
-    if [ ${#files[@]} -eq 0 ]; then
-      echo "No frames found to deduplicate."
-      exit 0
-    fi
 
     declare -A seen
     local deleted_count=0
@@ -151,9 +143,14 @@ extract-frames () {
       else
         seen[$hash]=1
       fi
-    done < <(md5sum "${files[@]}")
+    done < <(printf '%s\0' frame_*.png | xargs -0 md5sum 2>/dev/null)
 
     local remaining=(frame_*.png)
+    if [ ${#remaining[@]} -eq 0 ]; then
+      echo "No frames remaining after deduplication."
+      exit 0
+    fi
+
     local i=1
     for file in "${remaining[@]}"; do
       local newname
