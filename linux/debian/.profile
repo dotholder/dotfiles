@@ -2,7 +2,8 @@
 # Exit if not running interactively
 [[ $- != *i* ]] && return
 
-fastfetch
+# Show system info if fastfetch is installed
+command -v fastfetch &>/dev/null && fastfetch
 
 # ============================
 # Aliases
@@ -10,8 +11,8 @@ fastfetch
 
 # Package management
 alias update='sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo apt clean'
-alias install='sudo apt install -y'
-alias remove='sudo apt purge -y'
+alias installpkg='sudo apt install -y'
+alias removepkg='sudo apt purge -y'
 alias search='apt-cache search'
 
 # System commands
@@ -30,7 +31,11 @@ alias gc='git clone'
 alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # yt-dlp aliases
-alias yt-playlist="yt-best -cio '%(autonumber)s-%(title)s.%(ext)s'"
+alias yt='yt-dlp'
+alias yt-best="yt --cookies-from-browser brave -f bestvideo+bestaudio"
+alias ytv='yt -f bestvideo'
+alias yta='yt -f bestaudio'
+alias yt-playlist="yt-best -o '%(autonumber)s-%(title)s.%(ext)s'"
 alias yta-aac="yt --extract-audio --audio-format aac"
 alias yta-best="yt --extract-audio --audio-format best"
 alias yta-flac="yt --extract-audio --audio-format flac"
@@ -39,28 +44,18 @@ alias yta-mp3="yt --extract-audio --audio-format mp3"
 alias yta-opus="yt --extract-audio --audio-format opus"
 alias yta-vorbis="yt --extract-audio --audio-format vorbis"
 alias yta-wav="yt --extract-audio --audio-format wav"
-alias yt-best="yt --cookies-from-browser firefox -f bestvideo+bestaudio"
-alias yt='yt-dlp'
-alias ytv='yt -f bestvideo'
-alias yta='yt -f bestaudio'
-alias downloadchannel='yt-best -ciw -o "%(title)s.%(ext)s"'
+alias downloadchannel='yt-best -w -o "%(title)s.%(ext)s"'
 
 # ============================
 # Shell Behavior and Prompt
 # ============================
 
-# Make tab cycle through completion options instead of just listing them
-bind 'TAB:menu-complete'
-
-# Show all completions on first tab press if there are multiple options
+# Ignore case in tab completion & show on first tab press
+bind 'set completion-ignore-case on'
 bind 'set show-all-if-ambiguous on'
 
-# Don't put duplicate lines or lines starting with space in the history
+# Don't put duplicate lines or lines starting with space in history
 HISTCONTROL=ignoreboth
-
-# Ignore case in tab completion
-bind "set completion-ignore-case on"
-
 
 # Shell prompt
 PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\e[37m\]\\$ \[\e[0m\]"
