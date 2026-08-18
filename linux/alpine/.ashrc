@@ -1,0 +1,185 @@
+#!/bin/sh
+
+# Exit if not running interactively
+case $- in
+  *i*) ;;
+    *) return 0 ;;
+esac
+
+# Show system info if fastfetch is installed
+command -v fastfetch >/dev/null 2>&1 && fastfetch
+
+# ============================
+# Aliases
+# ============================
+
+# Package management
+alias update='sudo apk update && sudo apk upgrade'
+alias installpkg='sudo apk add'
+alias removepkg='sudo apk del'
+alias search='apk search'
+
+# System commands
+alias reboot='sudo reboot'
+alias poweroff='sudo poweroff'
+alias info='inxi -Fxxxrza'
+
+# Navigation & files
+alias ls='eza -l --color=always --group-directories-first'
+alias la='eza -al --color=always --group-directories-first'
+alias ..='cd ..'
+alias rm='rm -iv'
+
+# Git aliases
+alias gc='git clone'
+alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
+
+# yt-dlp aliases
+alias yt='yt-dlp'
+alias yt-best="yt --cookies-from-browser brave -f bestvideo+bestaudio"
+alias ytv='yt -f bestvideo'
+alias yta='yt -f bestaudio'
+alias yt-playlist="yt-best -o '%(autonumber)s-%(title)s.%(ext)s'"
+alias yta-aac="yt --extract-audio --audio-format aac"
+alias yta-best="yt --extract-audio --audio-format best"
+alias yta-flac="yt --extract-audio --audio-format flac"
+alias yta-m4a="yt --extract-audio --audio-format m4a"
+alias yta-mp3="yt --extract-audio --audio-format mp3"
+alias yta-opus="yt --extract-audio --audio-format opus"
+alias yta-vorbis="yt --extract-audio --audio-format vorbis"
+alias yta-wav="yt --extract-audio --audio-format wav"
+alias downloadchannel='yt-best -w -o "%(title)s.%(ext)s"'
+
+# ============================
+# Shell Behavior and Prompt
+# ============================
+
+# History settings
+export HISTFILE="$HOME/.ash_history"
+export HISTSIZE=1000
+
+# Enable interactive history file loading
+export ENV="$HOME/.ashrc"
+
+# Shell prompt
+PS1='\033[1;31m[\033[33m\u\033[32m@\033[34m\h \033[35m\W\033[31m]\033[37m\$ \033[0m'
+
+# ====================
+# Functions
+# ====================
+
+# Archive extractor
+ex() {
+  if [ -z "$1" ]; then
+    echo "Usage: ex <file>"
+    return 1
+  fi
+
+  if [ -f "$1" ]; then
+    case "$1" in
+      *.tar|*.tar.*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst) tar xf "$1" ;;
+      *.bz2)   bunzip2 "$1" ;;
+      *.rar)   unrar x "$1" ;;
+      *.gz)    gunzip "$1" ;;
+      *.zip)   unzip "$1" ;;
+      *.Z)     uncompress "$1" ;;
+      *.7z)    7z x "$1" ;;
+      *.lzma)  lzma -d "$1" ;;
+      *.xz)    unxz "$1" ;;
+      *.deb)   ar x "$1" ;;
+      *)       echo "'$1' cannot be extracted via ex()" ; return 1 ;;
+    esac
+  else
+    echo "'$1' is not a valid file"
+    return 1
+  fi
+}
+
+# Video frame extractor
+extract-frames () {
+  local input_file="$1"
+  local output_dir="${2:-}"
+
+  if [ -z "$input_file" ]; then
+    echo "Usage: extract-frames <video_file> [output_dir]"
+    return 1
+  fi
+
+  if [ ! -f "$input_file" ]; then
+    echo "Error: Input file \"$input_file\" does not exist"
+    return 1
+  fi
+
+  local filename="${input_file##*/}"
+  local base_name="${filename%.*}"
+  output_dir="${output_dir:-${base_name}_frames}"
+
+  mkdir -p "$output_dir"
+
+  echo "Extracting frames..."
+  echo "Output → $output_dir/frame_00000001.png"
+
+  local cores
+  cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+  ffmpeg -threads "$cores" -i "$input_file" \
+    -vf mpdecimate \
+    -fps_mode passthrough \
+    -start_number 1 \
+    -c:v png \
+    -pred mixed \
+    -compression_level 6 \
+    "$output_dir/frame_%08d.png" \
+    -loglevel error -stats
+
+  if [ $? -ne 0 ]; then
+    echo "Error: ffmpeg extraction failed"
+    return 1
+  fi
+
+  echo "✅ Extraction complete"
+  echo "Removing exact duplicate frames..."
+
+  (
+    cd "$output_dir" || exit 1
+
+    set -- frame_*.png
+    if [ ! -e "$1" ]; then
+      echo "No frames remaining after deduplication."
+      exit 0
+    fi
+
+    local deleted_count=0
+    local dup_files
+    local file
+
+    dup_files=$(printf '%s\0' frame_*.png | xargs -0 md5sum 2>/dev/null | awk 'seen[$1]++ { print $2 }')
+
+    if [ -n "$dup_files" ]; then
+      for file in $dup_files; do
+        rm -f "$file"
+        deleted_count=$((deleted_count + 1))
+      done
+    fi
+
+    set -- frame_*.png
+    if [ ! -e "$1" ]; then
+      echo "No frames remaining after deduplication."
+      exit 0
+    fi
+
+    local i=1
+    for file in "$@"; do
+      [ -e "$file" ] || continue
+      local newname
+      newname=$(printf "frame_%08d.png" "$i")
+      if [ "$file" != "$newname" ]; then
+        mv "$file" "$newname"
+      fi
+      i=$((i + 1))
+    done
+
+    local unique_count=$((i - 1))
+    echo "✅ Deduplication complete: $deleted_count duplicate(s) removed, $unique_count unique frame(s) kept"
+  )
+}
