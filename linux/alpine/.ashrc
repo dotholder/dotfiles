@@ -36,7 +36,7 @@ alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # yt-dlp aliases
 alias yt='yt-dlp'
-alias yt-best="yt --cookies-from-browser brave -f bestvideo+bestaudio"
+alias yt-best="yt --cookies-from-browser chromium -f bestvideo+bestaudio"
 alias ytv='yt -f bestvideo'
 alias yta='yt -f bestaudio'
 alias yt-playlist="yt-best -o '%(autonumber)s-%(title)s.%(ext)s'"
