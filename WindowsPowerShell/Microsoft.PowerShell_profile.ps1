@@ -24,6 +24,14 @@ function .. {
     Set-Location .. 
 }
 
+if (Test-Path Alias:ls) {
+    Remove-Item Alias:ls -Force
+}
+
+function ls {
+    Get-ChildItem -Name $args
+}
+
 function rmf {
     param(
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
