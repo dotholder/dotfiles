@@ -28,8 +28,36 @@ if (Test-Path Alias:ls) {
     Remove-Item Alias:ls -Force
 }
 
+if (-not ('ExplorerSorter' -as [type])) {
+    Add-Type -TypeDefinition @"
+    using System;
+    using System.Runtime.InteropServices;
+    using System.Collections;
+    using System.Collections.Generic;
+
+    public class ExplorerSorter : IComparer, IComparer<string> {
+        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        public static extern int StrCmpLogicalW(string x, string y);
+
+        public int Compare(string x, string y) {
+            return StrCmpLogicalW(x, y);
+        }
+
+        public int Compare(object x, object y) {
+            string sx = (x != null) ? x.ToString() : null;
+            string sy = (y != null) ? y.ToString() : null;
+            return StrCmpLogicalW(sx, sy);
+        }
+    }
+"@
+}
+
 function ls {
-    Get-ChildItem -Name $args
+    [string[]]$items = Get-ChildItem -Name @args
+    if ($items.Count -gt 1) {
+        [Array]::Sort($items, [ExplorerSorter]::new())
+    }
+    $items
 }
 
 function rmf {
@@ -103,7 +131,7 @@ function yt-playlist {
     yt-dlp -f bestvideo+bestaudio --continue --ignore-errors -o '%(autonumber)s-%(title)s.%(ext)s' @Arguments
 }
 
-function ytmp4 {
+function yt-mp4 {
     param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
     yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 @Arguments
 }
