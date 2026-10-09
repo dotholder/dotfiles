@@ -21,8 +21,8 @@ alias poweroff='sudo poweroff'
 alias info='inxi -Fxxxrza'
 
 # Navigation & files
-alias ls='eza -l --color=always --group-directories-first'
-alias la='eza -al --color=always --group-directories-first'
+alias ls='eza -l --color=auto --group-directories-first'
+alias la='eza -al --color=auto --group-directories-first'
 alias ..='cd ..'
 alias rm='rm -iv'
 
@@ -54,8 +54,11 @@ alias downloadchannel='yt-best -w -o "%(title)s.%(ext)s"'
 bind 'set completion-ignore-case on'
 bind 'set show-all-if-ambiguous on'
 
-# Don't put duplicate lines or lines starting with space in history
+# History settings
 HISTCONTROL=ignoreboth
+HISTSIZE=10000
+HISTFILESIZE=20000
+shopt -s histappend # Append history instead of overwriting on shell exit
 
 # Shell prompt
 PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\e[37m\]\\$ \[\e[0m\]"
@@ -66,7 +69,12 @@ PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\
 
 # Archive extractor
 ex () {
-  if [ -f "$1" ]; then
+  if [[ -z "$1" ]]; then
+    echo "Usage: ex <archive_file>"
+    return 1
+  fi
+
+  if [[ -f "$1" ]]; then
     case "$1" in
       *.tar|*.tar.*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst) tar xf "$1" ;;
       *.bz2)   bunzip2 "$1" ;;
@@ -78,25 +86,26 @@ ex () {
       *.lzma)  lzma -d "$1" ;;
       *.xz)    unxz "$1" ;;
       *.deb)   ar x "$1" ;;
-      *)       echo "'$1' cannot be extracted" ;;
+      *)       echo "'$1' cannot be extracted via ex()" ;;
     esac
   else
     echo "'$1' is not a valid file"
+    return 1
   fi
 }
 
 # Video frame extractor
 extract-frames () {
-  local input_file="$1"
+  local input_file="${1:-}"
   local output_dir="${2:-}"
 
-  if [ -z "$input_file" ]; then
+  if [[ -z "$input_file" ]]; then
     echo "Usage: extract-frames <video_file> [output_dir]"
     return 1
   fi
 
-  if [ ! -f "$input_file" ]; then
-    echo "Error: Input file \"$input_file\" does not exist"
+  if [[ ! -f "$input_file" ]]; then
+    echo "Error: Input file '$input_file' does not exist"
     return 1
   fi
 
@@ -107,7 +116,6 @@ extract-frames () {
   mkdir -p "$output_dir"
 
   echo "Extracting frames..."
-  echo "Output → $output_dir/frame_00000001.png"
 
   local cores
   cores=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -119,16 +127,15 @@ extract-frames () {
     -c:v png \
     -pred mixed \
     -compression_level 6 \
-    "$output_dir/frame_%08d.png" \
-    -loglevel error -stats
+    -loglevel error -stats \
+    "$output_dir/frame_%08d.png"
 
-  if [ $? -ne 0 ]; then
+  if [[ $? -ne 0 ]]; then
     echo "Error: ffmpeg extraction failed"
     return 1
   fi
 
-  echo "✅ Extraction complete"
-  echo "Removing exact duplicate frames..."
+  echo -e "\n✅ Extraction complete. Removing duplicate frames..."
 
   (
     cd "$output_dir" || exit 1
@@ -137,6 +144,7 @@ extract-frames () {
     declare -A seen
     local deleted_count=0
 
+    # Use find to prevent 'Argument list too long' on thousands of files
     while read -r hash file; do
       if [[ -n "${seen[$hash]}" ]]; then
         rm -f "$file"
@@ -144,10 +152,10 @@ extract-frames () {
       else
         seen[$hash]=1
       fi
-    done < <(printf '%s\0' frame_*.png | xargs -0 md5sum 2>/dev/null)
+    done < <(find . -maxdepth 1 -name 'frame_*.png' -print0 | xargs -0 md5sum 2>/dev/null)
 
     local remaining=(frame_*.png)
-    if [ ${#remaining[@]} -eq 0 ]; then
+    if [[ ${#remaining[@]} -eq 0 ]]; then
       echo "No frames remaining after deduplication."
       exit 0
     fi
@@ -156,7 +164,7 @@ extract-frames () {
     for file in "${remaining[@]}"; do
       local newname
       newname=$(printf "frame_%08d.png" "$i")
-      if [ "$file" != "$newname" ]; then
+      if [[ "$file" != "$newname" ]]; then
         mv "$file" "$newname"
       fi
       ((i++))
