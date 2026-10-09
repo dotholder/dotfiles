@@ -18,13 +18,13 @@ alias search='apt-cache search'
 # System commands
 alias reboot='sudo reboot'
 alias poweroff='sudo poweroff'
-alias info='inxi -Fxxxrza'
+alias sysinfo='inxi -Fxxxrza'
 
 # Navigation & files
 alias ls='eza -l --color=auto --group-directories-first'
 alias la='eza -al --color=auto --group-directories-first'
 alias ..='cd ..'
-alias rm='rm -iv'
+alias rm='rm -Iv'
 
 # Git aliases
 alias gc='git clone'

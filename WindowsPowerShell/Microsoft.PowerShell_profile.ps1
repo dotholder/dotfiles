@@ -19,10 +19,11 @@ function search {
     choco search $PackageName
 }
 
-# Navigation & files
-function .. { 
-    Set-Location .. 
-}
+# ============================
+# Navigation & File Management
+# ============================
+
+function .. { Set-Location .. }
 
 if (Test-Path Alias:ls) {
     Remove-Item Alias:ls -Force
@@ -35,17 +36,13 @@ if (-not ('ExplorerSorter' -as [type])) {
     using System.Collections;
     using System.Collections.Generic;
 
-    public class ExplorerSorter : IComparer, IComparer<string> {
+    public class ExplorerSorter : IComparer, IComparer<object> {
         [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
         public static extern int StrCmpLogicalW(string x, string y);
 
-        public int Compare(string x, string y) {
-            return StrCmpLogicalW(x, y);
-        }
-
         public int Compare(object x, object y) {
-            string sx = (x != null) ? x.ToString() : null;
-            string sy = (y != null) ? y.ToString() : null;
+            string sx = x?.ToString();
+            string sy = y?.ToString();
             return StrCmpLogicalW(sx, sy);
         }
     }
@@ -53,22 +50,20 @@ if (-not ('ExplorerSorter' -as [type])) {
 }
 
 function ls {
-    [string[]]$items = Get-ChildItem -Name @args
+    $items = Get-ChildItem @args
     if ($items.Count -gt 1) {
-        [Array]::Sort($items, [ExplorerSorter]::new())
+        $sorter = [ExplorerSorter]::new()
+        [Array]::Sort($items, [System.Comparison[object]]{ param($x, $y) $sorter.Compare($x.Name, $y.Name) })
     }
     $items
 }
 
 function rmf {
     param(
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Alias('FullName')]
         [string[]]$Path
     )
-
-    begin {
-        $ErrorActionPreference = 'Continue'
-    }
 
     process {
         foreach ($p in $Path) {
@@ -76,7 +71,7 @@ function rmf {
                 Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop
             }
             catch {
-                Write-Warning "Could not remove $p completely: $_"
+                Write-Warning "Could not remove '$p': $_"
             }
         }
     }
@@ -112,17 +107,17 @@ foreach ($format in $audioFormats) {
 }
 
 function yt-best {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
     yt-dlp -f bestvideo+bestaudio @Arguments
 }
 
 function ytv {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
     yt-dlp -f bestvideo @Arguments
 }
 
 function yta {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
     yt-dlp -f bestaudio @Arguments
 }
 
@@ -132,12 +127,12 @@ function yt-playlist {
 }
 
 function yt-mp4 {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
     yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 @Arguments
 }
 
 function downloadchannel {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Arguments)
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
     yt-dlp -f bestvideo+bestaudio --continue --ignore-errors --no-overwrites -o "%(title)s.%(ext)s" @Arguments
 }
 
@@ -152,61 +147,54 @@ if (Test-Path $ChocolateyProfile) {
 }
 
 # Shell prompt
-function prompt {
-    $ESC = [char]27
-    $username = $env:USERNAME
-    $hostname = $env:COMPUTERNAME
-    $currPath = (Get-Location).Path
-    $location = Split-Path -Leaf -Path $currPath
-    if ([string]::IsNullOrWhiteSpace($location)) { $location = $currPath }
-    
-    "$ESC[1;31m[$ESC[33m$username$ESC[32m@$ESC[34m$hostname $ESC[35m$location$ESC[31m]$ESC[37m$ $ESC[0m"
+$ChocolateyProfile = "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+if (Test-Path -LiteralPath $ChocolateyProfile) {
+    Import-Module $ChocolateyProfile -ErrorAction SilentlyContinue
 }
 
-# ====================
-# Functions
-# ====================
+function prompt {
+    $e = [char]27
+    "$e[1;36m$PWD $e[1;35mν $e[0m"
+}
 
-# Video frame extractor
+# ============================
+# Functions
+# ============================
+
 function Extract-Frames {
+    [CmdletBinding()]
     param(
+        [Parameter(Mandatory=$true, Position=0)]
         [string]$InputFile,
+
         [string]$OutputDir = ""
     )
 
-    if (-not $InputFile) {
-        Write-Error "Usage: Extract-Frames -InputFile <video_file> [-OutputDir <output_dir>]"
+    if (-not (Test-Path -LiteralPath $InputFile)) {
+        Write-Error "Error: Input file '$InputFile' does not exist."
         return
     }
 
-    if (-not (Test-Path -LiteralPath $InputFile)) {
-        $cleanedPath = $InputFile -replace '`([\[\]])', '$1'
-        if (Test-Path -LiteralPath $cleanedPath) {
-            $InputFile = $cleanedPath
-        } else {
-            Write-Error "Error: Input file '$InputFile' does not exist"
-            return
-        }
-    }
+    $fileItem = Get-Item -LiteralPath $InputFile
 
     if (-not $OutputDir) {
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($InputFile)
-        $sanitizedName = $baseName -replace '[^\w\-\.]', '_'
-        $OutputDir = Join-Path (Get-Location) "${sanitizedName}_frames"
+        $sanitizedName = $fileItem.BaseName -replace '[^\w\-\.]', '_'
+        $OutputDir = Join-Path $fileItem.DirectoryName "${sanitizedName}_frames"
     }
 
     if (-not (Test-Path -LiteralPath $OutputDir)) {
-        New-Item -ItemType Directory -Path $OutputDir | Out-Null
+        New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
     }
 
-    $resolvedInput = (Convert-Path -LiteralPath $InputFile)
-    $resolvedOutput = (Convert-Path -LiteralPath $OutputDir)
+    $resolvedInput = $fileItem.FullName
+    $resolvedOutput = (Get-Item -LiteralPath $OutputDir).FullName
 
-    Write-Host "Extracting frames to $resolvedOutput..."
+    Write-Host "Extracting unique frames to '$resolvedOutput'..."
 
     $outputPattern = Join-Path $resolvedOutput "frame_%06d.png"
     
     $ffmpegArgs = @(
+        "-y"
         "-hide_banner"
         "-loglevel", "error"
         "-i", $resolvedInput
@@ -220,168 +208,100 @@ function Extract-Frames {
     & ffmpeg @ffmpegArgs
     
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "$([char]0x274C) Extraction failed"
+        Write-Warning "Extraction failed with exit code $LASTEXITCODE"
         return
     }
 
-    $savedFiles = Get-ChildItem -LiteralPath $resolvedOutput -Filter "frame_*.png" | Sort-Object Name
-    $totalExtracted = $savedFiles.Count
-    
-    if ($totalExtracted -eq 0) {
-        Write-Host "$([char]0x274C) No frames were extracted."
-        return
-    }
-
-    Write-Host "Checking checksums for $totalExtracted frames..."
-
-    $seenHashes = @{}
-    $deletedCount = 0
-
-    foreach ($file in $savedFiles) {
-        $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm MD5).Hash
-
-        if ($seenHashes.ContainsKey($hash)) {
-            Remove-Item -LiteralPath $file.FullName -Force
-            $deletedCount++
-        } else {
-            $seenHashes[$hash] = $file.FullName
-        }
-    }
-
-    $remainingCount = $totalExtracted - $deletedCount
-    Write-Host "$([char]0x2705) Done: $remainingCount unique frames saved ($deletedCount duplicates removed) in $resolvedOutput"
+    $savedFiles = Get-ChildItem -LiteralPath $resolvedOutput -Filter "frame_*.png"
+    Write-Host "$([char]0x2705) Done: $($savedFiles.Count) frames saved in $resolvedOutput"
 }
 
-# Video flipper
 function Flip-Video {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [string]$InputFilePath,
 
         [ValidateSet("Default", "Fast", "Ultrafast", "NVENC")]
         [string]$Speed = "Default"
     )
 
-    try {
-        $cleanPath = $InputFilePath.Trim()
-
-        if (-not (Test-Path $cleanPath)) {
-            Write-Host "$([char]0x274C) Input file not found: $cleanPath"
-            return
-        }
-
-        $fileInfo = Get-Item $cleanPath
-        $directory = $fileInfo.DirectoryName
-        $nameWithoutExt = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
-        $extension = $fileInfo.Extension
-        $outputFile = Join-Path $directory "${nameWithoutExt}_flipped${extension}"
-
-        Write-Host "Flipping video horizontally..."
-        Write-Host "Input: $($fileInfo.FullName)"
-        Write-Host "Output: $outputFile"
-        Write-Host "Speed mode: $Speed"
-
-        switch ($Speed) {
-            "Fast"      { $extraArgs = @("-c:v", "libx264", "-preset", "veryfast", "-crf", "18") }
-            "Ultrafast" { $extraArgs = @("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23") }
-            "NVENC"     { $extraArgs = @("-c:v", "h264_nvenc", "-preset", "p7", "-cq", "19") }
-            default     { $extraArgs = @() }
-        }
-
-        & ffmpeg -i "$($fileInfo.FullName)" -vf "hflip" -c:a copy @extraArgs "$outputFile"
-
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "$([char]0x2705) Video flipped successfully"
-        } else {
-            Write-Host "$([char]0x274C) Failed to flip video (Exit code: $LASTEXITCODE)"
-        }
+    if (-not (Test-Path -LiteralPath $InputFilePath)) {
+        Write-Host "$([char]0x274C) Input file not found: $InputFilePath"
+        return
     }
-    catch {
-        Write-Host "$([char]0x274C) Error: $_"
+
+    $fileInfo = Get-Item -LiteralPath $InputFilePath
+    $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)_flipped$($fileInfo.Extension)"
+
+    switch ($Speed) {
+        "Fast"      { $extraArgs = @("-c:v", "libx264", "-preset", "veryfast", "-crf", "18") }
+        "Ultrafast" { $extraArgs = @("-c:v", "libx264", "-preset", "ultrafast", "-crf", "23") }
+        "NVENC"     { $extraArgs = @("-c:v", "h264_nvenc", "-preset", "p7", "-cq", "19") }
+        default     { $extraArgs = @("-c:v", "libx264") }
+    }
+
+    & ffmpeg -y -i $fileInfo.FullName -vf "hflip" @extraArgs -c:a copy "$outputFile"
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "$([char]0x2705) Video flipped successfully -> $outputFile"
+    } else {
+        Write-Host "$([char]0x274C) Failed to flip video (Exit code: $LASTEXITCODE)"
     }
 }
 
-# Video reverser
 function Reverse-Video {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true, Position=0)]
         [string]$InputFilePath,
-        [string]$Preset = "veryfast"  # Options: ultrafast, superfast, veryfast, fast, medium (default), etc.
+        [string]$Preset = "veryfast"
     )
 
-    try {
-        $cleanPath = $InputFilePath.Trim()
-
-        if (-not (Test-Path $cleanPath)) {
-            Write-Host "$([char]0x274C) Input file not found: $cleanPath"
-            return
-        }
-
-        $fileInfo = Get-Item $cleanPath
-        $directory = $fileInfo.DirectoryName
-        $nameWithoutExt = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
-        $extension = $fileInfo.Extension
-
-        $outputFile = Join-Path $directory "${nameWithoutExt}_reversed${extension}"
-
-        Write-Host "Reversing video (using preset: $Preset)..."
-        Write-Host "Input: $($fileInfo.FullName)"
-        Write-Host "Output: $outputFile"
-
-        & ffmpeg -i "$($fileInfo.FullName)" -vf "reverse" -af "areverse" -c:v libx264 -preset $Preset -crf 23 -c:a aac "$outputFile"
-
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "$([char]0x2705) Video reversed successfully"
-        } else {
-            Write-Host "$([char]0x274C) Failed to reverse video (Exit code: $LASTEXITCODE)"
-        }
+    if (-not (Test-Path -LiteralPath $InputFilePath)) {
+        Write-Host "$([char]0x274C) Input file not found: $InputFilePath"
+        return
     }
-    catch {
-        Write-Host "$([char]0x274C) Error: $_"
+
+    $fileInfo = Get-Item -LiteralPath $InputFilePath
+    $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)_reversed$($fileInfo.Extension)"
+
+    Write-Host "Reversing video (using preset: $Preset)..."
+
+    & ffmpeg -y -i $fileInfo.FullName -vf "reverse" -af "areverse" -c:v libx264 -preset $Preset -crf 23 -c:a aac "$outputFile"
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "$([char]0x2705) Video reversed successfully -> $outputFile"
+    } else {
+        Write-Host "$([char]0x274C) Failed to reverse video (Exit code: $LASTEXITCODE)"
     }
 }
 
-# MP4 Video Converter
-function mp4 {
+function ConvertTo-Mp4 {
     param (
         [Parameter(Mandatory=$true, Position=0)]
         [string]$InputFilePath,
 
-        [string]$Preset = "medium",  # Options: ultrafast, superfast, veryfast, fast, medium, slow
-        [int]$CRF = 23              # Lower = higher quality/larger file (18-28 is sweet spot)
+        [string]$Preset = "medium",
+        [int]$CRF = 23
     )
 
-    try {
-        $cleanPath = $InputFilePath.Trim()
-
-        if (-not (Test-Path $cleanPath)) {
-            Write-Host "$([char]0x274C) Input file not found: $cleanPath"
-            return
-        }
-
-        $fileInfo = Get-Item $cleanPath
-        $directory = $fileInfo.DirectoryName
-        $nameWithoutExt = [System.IO.Path]::GetFileNameWithoutExtension($fileInfo.Name)
-        $extension = $fileInfo.Extension.ToLower()
-
-        if ($extension -eq ".mp4") {
-            $outputFile = Join-Path $directory "${nameWithoutExt}_converted.mp4"
-        } else {
-            $outputFile = Join-Path $directory "${nameWithoutExt}.mp4"
-        }
-
-        Write-Host "Converting '$($fileInfo.Name)' to MP4..."
-        Write-Host "Output: $outputFile"
-
-        & ffmpeg -i "$($fileInfo.FullName)" -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
-
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "$([char]0x2705) Video converted to MP4 successfully!"
-        } else {
-            Write-Host "$([char]0x274C) Failed to convert video (Exit code: $LASTEXITCODE)"
-        }
+    if (-not (Test-Path -LiteralPath $InputFilePath)) {
+        Write-Host "$([char]0x274C) Input file not found: $InputFilePath"
+        return
     }
-    catch {
-        Write-Host "$([char]0x274C) Error: $_"
+
+    $fileInfo = Get-Item -LiteralPath $InputFilePath
+    $suffix = if ($fileInfo.Extension -eq ".mp4") { "_converted.mp4" } else { ".mp4" }
+    $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)$suffix"
+
+    Write-Host "Converting '$($fileInfo.Name)' to MP4..."
+
+    & ffmpeg -y -i $fileInfo.FullName -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "$([char]0x2705) Video converted to MP4 successfully -> $outputFile"
+    } else {
+        Write-Host "$([char]0x274C) Failed to convert video (Exit code: $LASTEXITCODE)"
     }
 }
+
+Set-Alias -Name mp4 -Value ConvertTo-Mp4 -Force
