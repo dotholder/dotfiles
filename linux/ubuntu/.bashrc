@@ -61,7 +61,7 @@ HISTFILESIZE=20000
 shopt -s histappend # Append history instead of overwriting on shell exit
 
 # Shell prompt
-PS1="\[\e[1;31m\][\[\e[33m\]\u\[\e[32m\]@\[\e[34m\]\h \[\e[35m\]\W\[\e[31m\]]\[\e[37m\]\\$ \[\e[0m\]"
+export PS1="\[\033[01;36m\]\w \[\033[01;35m\]ν \[\033[00m\]"
 
 # ====================
 # Functions
