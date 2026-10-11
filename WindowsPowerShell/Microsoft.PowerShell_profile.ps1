@@ -282,8 +282,8 @@ function ConvertTo-Mp4 {
         [Alias("FullName", "PSPath")]
         [string[]]$InputFilePath,
 
-        [string]$Preset = "medium",
-        [int]$CRF = 23
+        [string]$Preset = "slow",
+        [int]$CRF = 18
     )
 
     process {
@@ -296,18 +296,17 @@ function ConvertTo-Mp4 {
             }
 
             foreach ($fileInfo in $files) {
-                # Skip if the match is a directory
                 if ($fileInfo.PSIsContainer) { continue }
 
                 $suffix = if ($fileInfo.Extension -eq ".mp4") { "_converted.mp4" } else { ".mp4" }
                 $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)$suffix"
 
-                Write-Host "Converting '$($fileInfo.Name)' to MP4..."
+                Write-Host "Converting '$($fileInfo.Name)' to MP4 (Highest Quality)..."
 
-                & ffmpeg -y -i $fileInfo.FullName -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
+                & ffmpeg -y -i $fileInfo.FullName -c:v libx264 -preset $Preset -crf $CRF -c:a aac -b:a 320k -movflags +faststart "$outputFile"
 
                 if ($LASTEXITCODE -eq 0) {
-                    Write-Host "$([char]0x2705) Video converted successfully -> $outputFile" -ForegroundColor Green
+                    Write-Host "$([char]0x2705) Converted successfully -> $outputFile" -ForegroundColor Green
                 } else {
                     Write-Error "Failed to convert video '$($fileInfo.Name)' (Exit code: $LASTEXITCODE)"
                 }
