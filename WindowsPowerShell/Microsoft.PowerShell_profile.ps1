@@ -276,31 +276,43 @@ function Reverse-Video {
 }
 
 function ConvertTo-Mp4 {
+    [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [string]$InputFilePath,
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Alias("FullName", "PSPath")]
+        [string[]]$InputFilePath,
 
         [string]$Preset = "medium",
         [int]$CRF = 23
     )
 
-    if (-not (Test-Path -LiteralPath $InputFilePath)) {
-        Write-Host "$([char]0x274C) Input file not found: $InputFilePath"
-        return
-    }
+    process {
+        foreach ($path in $InputFilePath) {
+            $files = Get-Item -Path $path -ErrorAction SilentlyContinue
 
-    $fileInfo = Get-Item -LiteralPath $InputFilePath
-    $suffix = if ($fileInfo.Extension -eq ".mp4") { "_converted.mp4" } else { ".mp4" }
-    $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)$suffix"
+            if (-not $files) {
+                Write-Error "Input file not found or pattern matched no files: $path"
+                continue
+            }
 
-    Write-Host "Converting '$($fileInfo.Name)' to MP4..."
+            foreach ($fileInfo in $files) {
+                # Skip if the match is a directory
+                if ($fileInfo.PSIsContainer) { continue }
 
-    & ffmpeg -y -i $fileInfo.FullName -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
+                $suffix = if ($fileInfo.Extension -eq ".mp4") { "_converted.mp4" } else { ".mp4" }
+                $outputFile = Join-Path $fileInfo.DirectoryName "$($fileInfo.BaseName)$suffix"
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "$([char]0x2705) Video converted to MP4 successfully -> $outputFile"
-    } else {
-        Write-Host "$([char]0x274C) Failed to convert video (Exit code: $LASTEXITCODE)"
+                Write-Host "Converting '$($fileInfo.Name)' to MP4..."
+
+                & ffmpeg -y -i $fileInfo.FullName -c:v libx264 -preset $Preset -crf $CRF -c:a aac -movflags +faststart "$outputFile"
+
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "$([char]0x2705) Video converted successfully -> $outputFile" -ForegroundColor Green
+                } else {
+                    Write-Error "Failed to convert video '$($fileInfo.Name)' (Exit code: $LASTEXITCODE)"
+                }
+            }
+        }
     }
 }
 
