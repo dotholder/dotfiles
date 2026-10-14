@@ -24,7 +24,6 @@ alias sysinfo='inxi -Fxxxrza'
 alias ls='eza -l --color=auto --group-directories-first'
 alias la='eza -al --color=auto --group-directories-first'
 alias ..='cd ..'
-alias rm='rm -Iv'
 
 # Git aliases
 alias gc='git clone'
