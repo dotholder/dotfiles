@@ -10,7 +10,7 @@ command -v fastfetch &>/dev/null && fastfetch
 # ============================
 
 # Package management
-alias update='sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo apt clean'
+alias update='sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove --purge -y && sudo apt clean'
 alias installpkg='sudo apt install -y'
 alias removepkg='sudo apt purge -y'
 alias search='apt-cache search'
