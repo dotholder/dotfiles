@@ -31,7 +31,7 @@ alias dotfiles='git clone https://github.com/dotholder/dotfiles.git'
 
 # yt-dlp aliases
 alias yt='yt-dlp'
-alias yt-best="yt --cookies-from-browser brave -f bestvideo+bestaudio"
+alias yt-best="yt --cookies-from-browser chrome -f bestvideo+bestaudio"
 alias ytv='yt -f bestvideo'
 alias yta='yt -f bestaudio'
 alias yt-playlist="yt-best -o '%(autonumber)s-%(title)s.%(ext)s'"
@@ -77,7 +77,7 @@ ex () {
     case "$1" in
       *.tar|*.tar.*|*.tgz|*.tbz2|*.tbz|*.txz|*.tzst) tar xf "$1" ;;
       *.bz2)   bunzip2 "$1" ;;
-      *.rar)   unrar x "$1" ;;
+      *.rar)   unar x "$1" ;;
       *.gz)    gunzip "$1" ;;
       *.zip)   unzip "$1" ;;
       *.Z)     uncompress "$1" ;;
