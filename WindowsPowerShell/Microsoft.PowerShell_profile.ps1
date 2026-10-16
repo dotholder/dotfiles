@@ -215,23 +215,20 @@ if ($env:ChocolateyInstall) {
 
 function prompt {
     $e = [char]27
-    "$e[1;36m$PWD $e[1;35m$([char]0x03BD) $e[0m"
+    "$e[1;36m$PWD $e[1;35m$([char]0x03BD)$e[0m "
+}
+
+Set-PSReadLineOption -PromptText ' '
+
+Set-PSReadLineOption -Colors @{
+    Keyword = 'Yellow'
 }
 
 # ============================
 # Functions
 # ============================
 
-function Test-MediaTool {
-    param([Parameter(Mandatory=$true)][string]$Name)
-    if (-not (Get-Command -Name $Name -ErrorAction SilentlyContinue)) {
-        Write-Warning "'$Name' was not found in PATH. Install FFmpeg and make its executables available."
-        return $false
-    }
-    return $true
-}
-
-function Extract-Frames {
+function extractframes {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true, Position=0)]
@@ -294,7 +291,7 @@ function Extract-Frames {
     Write-Host "Done: $($savedFiles.Count) frames saved in $resolvedOutput" -ForegroundColor Green
 }
 
-function Flip-Video {
+function flipvid {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true, Position=0)]
@@ -333,7 +330,7 @@ function Flip-Video {
     }
 }
 
-function Reverse-Video {
+function reversevid {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true, Position=0)]
