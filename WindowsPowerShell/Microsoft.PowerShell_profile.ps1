@@ -28,14 +28,14 @@ function .. { Set-Location .. }
 $script:ExplorerSortAvailable = $false
 if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
     try {
-        if (-not ('ExplorerSorter' -as [type])) {
+        if (-not ('ExplorerDirectoryFirstSorter' -as [type])) {
             Add-Type -ErrorAction Stop -TypeDefinition @"
 using System;
 using System.Collections;
 using System.IO;
 using System.Runtime.InteropServices;
 
-public sealed class ExplorerSorter : IComparer {
+public sealed class ExplorerDirectoryFirstSorter : IComparer {
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int StrCmpLogicalW(string x, string y);
 
@@ -46,6 +46,11 @@ public sealed class ExplorerSorter : IComparer {
     }
 
     public int Compare(object x, object y) {
+        bool xIsDirectory = x is DirectoryInfo;
+        bool yIsDirectory = y is DirectoryInfo;
+        if (xIsDirectory != yIsDirectory) {
+            return xIsDirectory ? -1 : 1;
+        }
         return StrCmpLogicalW(GetName(x), GetName(y));
     }
 }
@@ -98,14 +103,21 @@ function ls {
     $items = @(Get-ChildItem @gciParams)
     if ($items.Count -gt 1) {
         if ($script:ExplorerSortAvailable) {
-            [Array]::Sort([object[]]$items, [System.Collections.IComparer]([ExplorerSorter]::new()))
+            [Array]::Sort([object[]]$items, [System.Collections.IComparer]([ExplorerDirectoryFirstSorter]::new()))
         } else {
             $items = @($items | Sort-Object -Property {
                 if ($_ -is [System.IO.FileSystemInfo]) { $_.Name } else { [string]$_ }
             })
         }
     }
-    $items
+
+    foreach ($item in $items) {
+        if ($item -is [System.IO.FileSystemInfo]) {
+            $item.Name
+        } else {
+            [string]$item
+        }
+    }
 }
 
 function rmf {
@@ -204,7 +216,7 @@ if ($env:ChocolateyInstall) {
 
 function prompt {
     $e = [char]27
-    "$e[1;36m$PWD $e[1;35mν $e[0m"
+    "$e[1;36m$PWD $e[1;35m$([char]0x03BD) $e[0m"
 }
 
 # ============================
