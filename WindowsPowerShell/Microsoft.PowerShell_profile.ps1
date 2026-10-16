@@ -193,7 +193,6 @@ function yt-playlist {
 
 function yt-mp4 {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
-    # Official yt-dlp preset prefers MP4-friendly codecs and remuxes if needed.
     yt-dlp -t mp4 @Arguments
 }
 
@@ -277,8 +276,6 @@ function Extract-Frames {
     $outputPattern = Join-Path $resolvedOutput 'frame_%06d.png'
     Write-Host "Extracting non-consecutive-duplicate frames to '$resolvedOutput'..."
 
-    # mpdecimate removes near-identical *successive* frames, not all repeats.
-    # Keep original timestamps; extracted PNG filenames use sequential numbers.
     $ffmpegArgs = @(
         '-nostdin', '-n', '-hide_banner', '-loglevel', 'error',
         '-i', $fileItem.FullName,
@@ -327,7 +324,6 @@ function Flip-Video {
         default     { $extraArgs = @('-c:v', 'libx264', '-preset', 'medium', '-crf', '23') }
     }
 
-    # MP4-compatible output: H.264 video and AAC audio (when present).
     & ffmpeg -nostdin -n -hide_banner -loglevel error -i $fileInfo.FullName -vf 'hflip' @extraArgs -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart $outputFile
 
     if ($LASTEXITCODE -eq 0) {
@@ -346,7 +342,6 @@ function Reverse-Video {
         [ValidateSet('ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo')]
         [string]$Preset = 'veryfast',
 
-        # Keep chunks short: FFmpeg's reverse/areverse filters buffer each chunk.
         [ValidateRange(1, 60)]
         [int]$ChunkSeconds = 10
     )
@@ -382,8 +377,6 @@ function Reverse-Video {
     }
     $hasAudio = ($audioLines.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace([string]$audioLines[0]))
 
-    # Create reversed chunks in reverse chronological order, then concatenate.
-    # This limits memory use compared with reversing the entire file at once.
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ('Reverse-Video-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tempDir -ErrorAction Stop | Out-Null
 
@@ -414,7 +407,6 @@ function Reverse-Video {
                 '-c:v', 'libx264', '-preset', $Preset, '-crf', '23'
             )
             if ($hasAudio) {
-                # Lossless chunk audio avoids AAC encoder-delay gaps at chunk joins.
                 $segmentArgs += @('-af', 'areverse,asetpts=PTS-STARTPTS', '-c:a', 'flac')
             } else {
                 $segmentArgs += '-an'
@@ -429,12 +421,10 @@ function Reverse-Video {
             [void]$chunkNames.Add($partName)
         }
 
-        # The list uses safe generated basenames, so quoting user paths is not needed.
         $listPath = Join-Path $tempDir 'concat.txt'
         $listLines = @($chunkNames | ForEach-Object { "file '$_'" })
         [System.IO.File]::WriteAllLines($listPath, [string[]]$listLines, (New-Object System.Text.UTF8Encoding($false)))
 
-        # Reencode FLAC audio once to AAC; copy the already-encoded H.264 video.
         & ffmpeg -nostdin -n -hide_banner -loglevel error -f concat -safe 0 -i $listPath -c:v copy -c:a aac -b:a 192k -movflags +faststart $outputFile
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Video reversed successfully -> $outputFile" -ForegroundColor Green
@@ -467,8 +457,7 @@ function ConvertTo-Mp4 {
         if (-not (Test-MediaTool 'ffmpeg')) { return }
 
         foreach ($path in $InputFilePath) {
-            # Use literal paths first; fall back to wildcard expansion to keep
-            # support for commands such as: mp4 *.mkv
+
             if (Test-Path -LiteralPath $path -PathType Leaf) {
                 $files = @(Get-Item -LiteralPath $path)
             } else {
